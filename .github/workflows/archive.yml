@@ -27,6 +27,7 @@ jobs:
         run: node scripts/archive.mjs
 
       - name: コミットして push
+        id: commit
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -36,8 +37,13 @@ jobs:
           else
             git commit -m "archive: $(date -u +%Y-%m-%dT%H:%MZ)"
             git push
+            echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
 
-      # push が成功したときだけ DB から消す
+      # 新しい画像が GitHub Pages に出るまで待ってから DB を消す（読み込み中の人の絵が欠けないように）
+      - name: Pages の反映を待つ
+        if: steps.commit.outputs.changed == 'true'
+        run: sleep 600
+
       - name: DB から古いデータを削除
         run: node scripts/archive.mjs --cleanup

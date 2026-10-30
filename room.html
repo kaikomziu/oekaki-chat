@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>絵チャ</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="room-page">
+  <header class="topbar">
+    <a href="./" class="back" title="部屋一覧へ">←</a>
+    <strong id="roomName" class="room-name">読み込み中…</strong>
+    <span id="roomBadge" class="badge" hidden></span>
+    <button id="copyLink" class="text-btn" title="この部屋の URL をコピー">🔗 URL</button>
+    <span id="online" class="muted small"></span>
+    <span id="status" class="status"></span>
+    <span class="spacer"></span>
+    <button id="togglePanel" class="text-btn panel-toggle" title="レイヤー・チャット">☰</button>
+  </header>
+
+  <div class="optionbar">
+    <div id="palette" class="palette"></div>
+    <input id="color" type="color" value="#000000" title="色を選ぶ">
+    <label class="opt" title="ブラシの太さ（[ と ] で増減）">太さ
+      <input id="size" type="range" min="1" max="200" value="6">
+      <input id="sizeNum" type="number" min="1" max="200" value="6">
+    </label>
+    <label class="opt" title="ブラシの不透明度">不透明度
+      <input id="alpha" type="range" min="1" max="100" value="100">
+      <span id="alphaLabel" class="num">100%</span>
+    </label>
+    <label class="opt" title="ペンタブレットの筆圧で太さを変える"><input id="pressure" type="checkbox" checked> 筆圧</label>
+    <label class="opt" title="手ぶれ補正（大きいほど線がなめらかに遅れて付いてくる）">補正
+      <input id="smoothing" type="range" min="0" max="10" value="3">
+      <span id="smoothingLabel" class="num">3</span>
+    </label>
+  </div>
+
+  <main class="workspace">
+    <nav class="toolbox">
+      <button data-tool="pen" title="ペン (B)">✏️</button>
+      <button data-tool="eraser" title="消しゴム (E)">🧽</button>
+      <button data-tool="eyedropper" title="スポイト (I / Alt+クリック)">💧</button>
+      <button data-tool="hand" title="手のひら (H / スペース+ドラッグ / 中ボタン)">✋</button>
+      <hr>
+      <button id="undo" title="取り消し (Ctrl+Z)">↶</button>
+      <button id="redo" title="やり直し (Ctrl+Shift+Z / Ctrl+Y)">↷</button>
+      <hr>
+      <button id="zoomIn" title="拡大 (+ / Ctrl+ホイール)">＋</button>
+      <button id="zoomFit" class="zoom-label" title="画面に合わせる (0)">100%</button>
+      <button id="zoomOut" title="縮小 (-)">－</button>
+      <hr>
+      <button id="download" title="PNG で保存（表示中のレイヤー）">💾</button>
+    </nav>
+
+    <div id="viewport" class="viewport">
+      <div id="stage" class="stage"></div>
+      <div id="brushCursor" class="brush-cursor" hidden></div>
+    </div>
+
+    <aside class="panel">
+      <section class="layers">
+        <header class="panel-head">レイヤー <span id="layerCount" class="muted small"></span></header>
+        <ul id="layerList" class="layer-list"></ul>
+        <div class="layer-actions">
+          <button id="layerAdd" title="レイヤーを追加">＋</button>
+          <button id="layerUp" title="上へ">▲</button>
+          <button id="layerDown" title="下へ">▼</button>
+          <button id="layerRename" title="名前を変える（ダブルクリックでも可）">✎</button>
+          <button id="layerClear" title="このレイヤーを全部消す">🧹</button>
+          <button id="layerDelete" title="レイヤーを削除">🗑</button>
+        </div>
+        <p class="muted small hint">👁 と不透明度は自分の画面だけに反映</p>
+      </section>
+      <section class="chat">
+        <header class="panel-head">チャット</header>
+        <ul id="messages" class="messages"></ul>
+        <form id="chatForm" class="chat-form">
+          <input id="name" placeholder="名前" maxlength="20" required>
+          <input id="body" placeholder="メッセージ" maxlength="300" required autocomplete="off">
+          <button type="submit">送信</button>
+        </form>
+      </section>
+    </aside>
+  </main>
+
+  <dialog id="passwordDialog" class="dialog">
+    <form id="passwordForm">
+      <h2>🔒 パスワード部屋</h2>
+      <p>この部屋に入るにはパスワードが必要です。</p>
+      <input id="passwordInput" type="password" required autocomplete="current-password" placeholder="パスワード">
+      <p id="passwordError" class="error" hidden></p>
+      <div class="dialog-actions">
+        <a href="./">部屋一覧へ</a>
+        <button type="submit" class="primary">入る</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="fatal" class="fatal" hidden>
+    <p id="fatalMessage"></p>
+    <a href="./">部屋一覧へ戻る</a>
+  </div>
+
+  <script type="module" src="room.js"></script>
+</body>
+</html>

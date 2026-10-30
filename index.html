@@ -6,35 +6,41 @@
   <title>絵チャ</title>
   <link rel="stylesheet" href="style.css">
 </head>
-<body>
-  <header class="toolbar">
-    <strong class="room">#<span id="room"></span></strong>
-    <div class="tools">
-      <button id="pen" class="tool active" title="ペン">✏️</button>
-      <button id="eraser" class="tool" title="消しゴム">🧽</button>
-      <div id="palette" class="palette"></div>
-      <input id="color" type="color" value="#000000" title="色を選ぶ">
-      <label class="size">太さ <input id="size" type="range" min="1" max="64" value="4"><span id="sizeLabel">4</span></label>
-      <button id="download" title="PNG で保存">💾</button>
-    </div>
-    <span id="online" class="online"></span>
-    <span id="status" class="status">読み込み中…</span>
-  </header>
+<body class="lobby">
+  <main class="lobby-main">
+    <h1>🎨 絵チャ</h1>
+    <p class="lead">みんなで同じキャンバスに描けるお絵描きチャット。レイヤー・筆圧・手ぶれ補正つき。</p>
 
-  <main class="layout">
-    <div class="board-wrap">
-      <canvas id="board"></canvas>
-    </div>
-    <aside class="chat">
-      <ul id="messages" class="messages"></ul>
-      <form id="chatForm" class="chat-form">
-        <input id="name" placeholder="名前" maxlength="20" required>
-        <input id="body" placeholder="メッセージ" maxlength="300" required autocomplete="off">
-        <button type="submit">送信</button>
+    <section class="card">
+      <h2>部屋を作る</h2>
+      <form id="createForm" class="create-form">
+        <label>部屋の名前
+          <input id="roomName" maxlength="40" required placeholder="例: らくがき部屋">
+        </label>
+        <fieldset>
+          <legend>公開範囲</legend>
+          <label class="radio"><input type="radio" name="visibility" value="public" checked>
+            <span><b>完全公開</b><small>この一覧に表示され、誰でも入れる</small></span></label>
+          <label class="radio"><input type="radio" name="visibility" value="unlisted">
+            <span><b>URL限定</b><small>一覧に出ない。URL を知っている人だけ入れる</small></span></label>
+          <label class="radio"><input type="radio" name="visibility" value="password">
+            <span><b>パスワード</b><small>一覧に出ない。URL とパスワードの両方が必要</small></span></label>
+        </fieldset>
+        <label id="passwordRow" hidden>パスワード（4〜72文字）
+          <input id="roomPassword" type="password" minlength="4" maxlength="72" autocomplete="new-password">
+        </label>
+        <button type="submit" class="primary">作成して入る</button>
+        <p id="createError" class="error" hidden></p>
       </form>
-    </aside>
-  </main>
+    </section>
 
-  <script type="module" src="app.js"></script>
+    <section class="card">
+      <h2>公開中の部屋</h2>
+      <ul id="roomList" class="room-list"><li class="muted">読み込み中…</li></ul>
+    </section>
+
+    <p class="muted small">URL限定・パスワード部屋の絵とログは、暗号化してから保存しています。</p>
+  </main>
+  <script type="module" src="lobby.js"></script>
 </body>
 </html>
