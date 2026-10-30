@@ -1,0 +1,43 @@
+name: archive
+
+on:
+  schedule:
+    - cron: '0 19 * * *'  # 毎日 4:00 (JST)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency: archive
+
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --no-audit --no-fund
+
+      - name: Supabase → data/ に書き出し
+        run: node scripts/archive.mjs
+
+      - name: コミットして push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data
+          if git diff --cached --quiet; then
+            echo "変更なし"
+          else
+            git commit -m "archive: $(date -u +%Y-%m-%dT%H:%MZ)"
+            git push
+          fi
+
+      # push が成功したときだけ DB から消す
+      - name: DB から古いデータを削除
+        run: node scripts/archive.mjs --cleanup

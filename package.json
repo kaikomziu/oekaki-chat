@@ -1,0 +1,12 @@
+{
+  "name": "oekaki-chat",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "archive": "node scripts/archive.mjs",
+    "cleanup": "node scripts/archive.mjs --cleanup"
+  },
+  "dependencies": {
+    "@napi-rs/canvas": "0.1.65"
+  }
+}
