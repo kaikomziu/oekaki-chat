@@ -52,11 +52,18 @@
 
 1. **Supabase**: SQL Editor で [supabase/schema.sql](supabase/schema.sql) を実行する（既存の絵チャのテーブルは作り直される）。
 2. **config.js**: Project URL と anon キーを [config.js](config.js) に書く。
-3. **GitHub**: Settings → Pages で `main` / `(root)` を公開し、
-   Settings → Secrets and variables → Actions に次の 2 つを登録する。
-   - `SUPABASE_URL`
-   - `SUPABASE_SERVICE_ROLE_KEY`（**service_role キーは Secrets にだけ置く**）
-4. Actions タブから `archive` を手動実行して、動くか確かめる。
+3. **GitHub**: Settings → Pages で `main` / `(root)` を公開する。
+4. **アーカイブ用の合言葉**: ランダムな文字列を作って GitHub Secrets の `OEKAKI_ARCHIVE_TOKEN` に登録し、
+   その SHA-256（16 進）を DB に登録する（service_role キーは使わない）。
+   ```bash
+   TOKEN=$(openssl rand -hex 32)
+   printf %s "$TOKEN" | gh secret set OEKAKI_ARCHIVE_TOKEN
+   printf %s "$TOKEN" | sha256sum   # これを下の SQL に入れる
+   ```
+   ```sql
+   update public.oekaki_config set archive_token_hash = '<上のハッシュ>';
+   ```
+5. Actions タブから `archive` を手動実行して、動くか確かめる。
 
 ## ローカルで試す
 

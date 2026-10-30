@@ -5,15 +5,19 @@
 //
 // 削除は push と Pages の反映を待ってから別ステップで行うので、途中で失敗してもデータは消えない。
 // リポジトリは公開なので、URL限定・パスワード部屋のファイルは部屋の secret から作った鍵で暗号化する。
+//
+// DB には公開用の anon キーと、アーカイブ専用の合言葉（OEKAKI_ARCHIVE_TOKEN）でアクセスする。
+// service_role キーは使わない。
 import { createCanvas, loadImage } from '@napi-rs/canvas';
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { W, H, renderStroke, isStroke } from '../render.js';
+import { SUPABASE_URL as CONFIG_URL, SUPABASE_ANON_KEY } from '../config.js';
 
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-if (!SUPABASE_URL || !KEY) throw new Error('SUPABASE_URL と SUPABASE_SERVICE_ROLE_KEY を設定してください');
+const SUPABASE_URL = process.env.SUPABASE_URL || CONFIG_URL;
+const TOKEN = process.env.OEKAKI_ARCHIVE_TOKEN;
+if (!TOKEN) throw new Error('OEKAKI_ARCHIVE_TOKEN を設定してください');
 
 const DATA_DIR = 'data';
 const BAKE_AFTER_MS = 60 * 60 * 1000;     // 取り消し（30 分以内）ができなくなった線だけ焼き込む
@@ -21,20 +25,22 @@ const MESSAGE_KEEP_MS = 24 * 3600 * 1000; // これより新しいチャット�
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const LAYER_FILE_RE = /^[A-Za-z0-9]{1,16}-\d+\.(png|bin)$/;
 
-async function rest(query, init = {}) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${query}`, {
-    ...init,
-    headers: { apikey: KEY, Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json', ...init.headers },
+async function rpc(name, args = {}) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${name}`, {
+    method: 'POST',
+    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_token: TOKEN, ...args }),
   });
-  if (!res.ok) throw new Error(`${res.status} ${query}: ${await res.text()}`);
+  if (!res.ok) throw new Error(`${res.status} ${name}: ${await res.text()}`);
   return res.status === 204 ? null : res.json();
 }
 
-async function fetchAll(table, select, filter = '') {
+// 1000 件ずつ id 順に全部取る
+async function fetchAll(name, args = {}) {
   const rows = [];
   let last = 0;
   for (;;) {
-    const page = await rest(`${table}?select=${select}&id=gt.${last}${filter}&order=id&limit=1000`);
+    const page = await rpc(name, { ...args, p_after: last });
     rows.push(...page);
     if (page.length < 1000) return rows;
     last = page.at(-1).id;
@@ -141,9 +147,9 @@ async function archiveMessages(room, messages, meta, key) {
 
 async function archive() {
   const msgCutoff = new Date(Date.now() - MESSAGE_KEEP_MS).toISOString();
-  const rooms = await fetchAll('oekaki_rooms', 'id,visibility,secret,layers');
-  const strokesByRoom = groupBy(await fetchAll('oekaki_strokes', 'id,room_id,sid,layer,tool,color,size,alpha,points,created_at'), 'room_id');
-  const messagesByRoom = groupBy(await fetchAll('oekaki_messages', 'id,room_id,name,body,created_at', `&created_at=lt.${msgCutoff}`), 'room_id');
+  const rooms = await rpc('oekaki_archive_rooms');
+  const strokesByRoom = groupBy(await fetchAll('oekaki_archive_strokes'), 'room_id');
+  const messagesByRoom = groupBy(await fetchAll('oekaki_archive_messages', { p_before: msgCutoff }), 'room_id');
 
   for (const room of rooms) {
     if (!UUID_RE.test(room.id)) continue;
@@ -169,8 +175,8 @@ async function cleanup() {
     .filter((d) => d.isDirectory() && UUID_RE.test(d.name)).map((d) => d.name);
   for (const id of dirs) {
     const meta = await readMeta(path.join(DATA_DIR, id));
-    if (meta.lastStrokeId) await rest(`oekaki_strokes?room_id=eq.${id}&id=lte.${meta.lastStrokeId}`, { method: 'DELETE' });
-    if (meta.lastMessageId) await rest(`oekaki_messages?room_id=eq.${id}&id=lte.${meta.lastMessageId}`, { method: 'DELETE' });
+    if (!meta.lastStrokeId && !meta.lastMessageId) continue;
+    await rpc('oekaki_archive_delete', { p_room: id, p_stroke_upto: meta.lastStrokeId ?? 0, p_message_upto: meta.lastMessageId ?? 0 });
   }
   console.log(`${dirs.length} 部屋ぶんの古いデータを DB から削除`);
 }

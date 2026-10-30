@@ -240,3 +240,63 @@ begin
   insert into oekaki_messages (room_id, name, body) values (p_room, btrim(p_name), btrim(p_body)) returning * into r;
   return jsonb_build_object('id', r.id, 'name', r.name, 'body', r.body, 'created_at', r.created_at);
 end $$;
+
+-- ---- アーカイブ（GitHub Actions）用 ----
+-- service_role キーを使わず、専用の合言葉（ハッシュだけ保存）で古いデータの読み出しと削除を許す。
+-- 合言葉は GitHub Secrets の OEKAKI_ARCHIVE_TOKEN に入れ、ハッシュを次で登録する:
+--   update public.oekaki_config set archive_token_hash = '<sha256 の 16 進>';
+
+create table public.oekaki_config (
+  id                 int primary key default 1 check (id = 1),
+  archive_token_hash text
+);
+alter table public.oekaki_config enable row level security;
+revoke all on public.oekaki_config from anon, authenticated;
+insert into public.oekaki_config (id) values (1);
+
+create function public.oekaki_archive_check(p_token text)
+returns void language plpgsql stable security definer set search_path = public, extensions as $$
+begin
+  if p_token is null or not exists (
+    select 1 from oekaki_config where archive_token_hash = encode(digest(p_token, 'sha256'), 'hex')
+  ) then
+    raise exception 'oekaki: forbidden' using errcode = '42501';
+  end if;
+end $$;
+revoke all on function public.oekaki_archive_check(text) from public, anon, authenticated;
+
+create function public.oekaki_archive_rooms(p_token text)
+returns table (id uuid, visibility text, secret text, layers jsonb)
+language plpgsql stable security definer set search_path = public as $$
+begin
+  perform oekaki_archive_check(p_token);
+  return query select r.id, r.visibility, r.secret, r.layers from oekaki_rooms r;
+end $$;
+
+create function public.oekaki_archive_strokes(p_token text, p_after bigint)
+returns table (id bigint, room_id uuid, sid uuid, layer text, tool text, color text, size smallint, alpha smallint, points jsonb, created_at timestamptz)
+language plpgsql stable security definer set search_path = public as $$
+begin
+  perform oekaki_archive_check(p_token);
+  return query
+    select s.id, s.room_id, s.sid, s.layer, s.tool, s.color, s.size, s.alpha, s.points, s.created_at
+    from oekaki_strokes s where s.id > p_after order by s.id limit 1000;
+end $$;
+
+create function public.oekaki_archive_messages(p_token text, p_after bigint, p_before timestamptz)
+returns table (id bigint, room_id uuid, name text, body text, created_at timestamptz)
+language plpgsql stable security definer set search_path = public as $$
+begin
+  perform oekaki_archive_check(p_token);
+  return query
+    select m.id, m.room_id, m.name, m.body, m.created_at
+    from oekaki_messages m where m.id > p_after and m.created_at < p_before order by m.id limit 1000;
+end $$;
+
+create function public.oekaki_archive_delete(p_token text, p_room uuid, p_stroke_upto bigint, p_message_upto bigint)
+returns void language plpgsql volatile security definer set search_path = public as $$
+begin
+  perform oekaki_archive_check(p_token);
+  delete from oekaki_strokes where room_id = p_room and id <= p_stroke_upto;
+  delete from oekaki_messages where room_id = p_room and id <= p_message_upto;
+end $$;
